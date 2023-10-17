@@ -11,6 +11,14 @@ myVector3D::myVector3D(double dx, double dy, double dz)
     dZ = dz;
 }
 
+myVector3D::myVector3D(const myPoint3D* p)
+{
+	dX = p->X;
+	dY = p->Y;
+	dZ = p->Z;
+}
+
+
 double myVector3D::operator*(myVector3D & v1)
 {
     return (v1.dX*dX + v1.dY*dY + v1.dZ*dZ);
@@ -104,4 +112,9 @@ void myVector3D::rotate(myVector3D & lp, double theta)
 void myVector3D::print(char *s)
 {
 	  std::cout << s << dX << ", " << dY << ", " << dZ << "\n";
+}
+
+float myVector3D::dot(const myVector3D* v) const
+{
+	return dX * v->dX + dY * v->dY + dZ * v->dZ;
 }

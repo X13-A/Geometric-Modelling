@@ -15,6 +15,7 @@ using namespace std;
 #include "mypoint3d.h"
 #include "myvector3d.h"
 #include "myMesh.h"
+#include <cmath>
 
 enum MENU { MENU_CATMULLCLARK, MENU_DRAWWIREFRAME, MENU_EXIT, MENU_DRAWMESH, MENU_LOOP, MENU_DRAWMESHVERTICES,
 	MENU_CONTRACTEDGE, MENU_CONTRACTFACE, MENU_DRAWCREASE, MENU_DRAWSILHOUETTE, 
@@ -168,6 +169,10 @@ void menu(int item)
 	case MENU_SIMPLIFY:
 		{
 			m->simplify();
+			m->computeNormals();
+			//m->simplify();
+			//m->computeNormals();
+			//m->simplify();
 			//m->computeNormals();
 			makeBuffers(m);
 		}
@@ -259,13 +264,24 @@ void display()
 		vector <GLuint> silhouette_edges;
 		for (vector<myHalfedge *>::iterator it = m->halfedges.begin(); it != m->halfedges.end(); it++)
 		{
-			/**** TODO: WRITE CODE TO COMPUTE SILHOUETTE ****/
+			// CALCULATE SILHOUETTE
 			myHalfedge *e = (*it);
 			myVertex *v1 = (*it)->source;
 			if ((*it)->twin == NULL) continue;
-			myVertex *v2 = (*it)->twin->source;
+			if ((*it)->adjacent_face == NULL) continue;
+			if ((*it)->twin == NULL) continue;
+			if ((*it)->twin->adjacent_face == NULL) continue;
 
-			if ( 0 /*ADD THE CONDITION TO CHECK IF THE HALFEDGE DEFINED BY (V1, V2) IS A SILHOUETTE EDGE*/ )
+			myVertex *v2 = (*it)->twin->source;
+			myVector3D normal1 = *(*it)->adjacent_face->normal;
+			myVector3D normal2 = *(*it)->twin->adjacent_face->normal;
+
+			myVector3D dir = myVector3D((camera_eye - (*v1->point + *v2->point) / 2));
+			dir.normalize();
+			float dotProd1 = dir.dot(&normal1);
+			float dotProd2 = dir.dot(&normal2);
+			bool highNormalDiff = abs(normal1.dot(&normal2)) <= 0.70710678118f;
+			if (dotProd1 * dotProd2 < 0)
 			{
 				silhouette_edges.push_back(v1->index);
 				silhouette_edges.push_back(v2->index);
@@ -377,7 +393,7 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile("cube.obj")) {
+	if (m->readFile("pyramid.obj")) {
 		m->computeNormals();
 		makeBuffers(m);
 	}

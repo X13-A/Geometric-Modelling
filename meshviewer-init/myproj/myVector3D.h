@@ -14,10 +14,9 @@ public:
 		double components[3];
 		struct { double dX, dY, dZ; };
 	};
-   
   
   myVector3D();
-
+  myVector3D(const myPoint3D* p);
   myVector3D(double dx, double dy, double dz);
   double operator*(myVector3D & v1);
   myVector3D operator+(myVector3D & v1);
@@ -34,6 +33,7 @@ public:
   void clear();
   void normalize( );
   void print(char *s);
+  float dot(const myVector3D* v) const;
 };
 
 #endif

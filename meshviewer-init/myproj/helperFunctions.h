@@ -47,9 +47,9 @@ enum { VAO_TRIANGLES_NORMSPERVERTEX = 0, VAO_TRIANGLES_NORMSPERFACE, VAO_EDGES, 
 
 
 bool smooth = false; //smooth = true means smooth normals, default false means face-wise normals.
-bool drawmesh = true;
+bool drawmesh = false;
 bool drawwireframe = true;
-bool drawmeshvertices = true;
+bool drawmeshvertices = false;
 bool drawsilhouette = false;
 bool drawnormals = false;
 

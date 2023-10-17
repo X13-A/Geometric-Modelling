@@ -9,7 +9,7 @@ myVertex::myVertex(void)
 {
 	point = NULL;
 	originof = NULL;
-	normal = new myVector3D(1.0,1.0,1.0);
+	normal = new myVector3D(1.0, 1.0, 1.0);
 }
 
 myVertex::~myVertex(void)
@@ -27,6 +27,10 @@ void myVertex::computeNormal()
 	myHalfedge* current_he = originof;
 	do
 	{
+		if ((uintptr_t)current_he == 0xDDDDDDDDD)
+		{
+			break;
+		}
 		if (!current_he) break;
 		if (!current_he->twin) break;
 		if (!current_he->adjacent_face) break;

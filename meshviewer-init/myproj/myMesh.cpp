@@ -262,7 +262,6 @@ void myMesh::normalize()
 	}
 }
 
-
 void myMesh::splitFaceTRIS(myFace *f, myPoint3D *p)
 {
 	/**** TODO ****/
@@ -278,7 +277,6 @@ void myMesh::splitFaceQUADS(myFace *f, myPoint3D *p)
 	/**** TODO ****/
 }
 
-
 void myMesh::subdivisionCatmullClark()
 {
 	/**** TODO ****/
@@ -287,23 +285,117 @@ void myMesh::subdivisionCatmullClark()
 void myMesh::triangulate()
 {
 	std::vector<myFace*> temp_faces = faces;
+	int fails = 0;
 	for (myFace* f : temp_faces)
 	{
 		if (!triangulate(f))
 		{
-			std::cerr << "Failed to triangulate a face!" << std::endl;
+			fails++;
 		}
 	}
+	if (fails > 0)
+	{
+		std::cerr << "Failed to triangulate " << fails << " face(s)!" << std::endl;
+	}
+	checkMesh();
 }
 
 void myMesh::simplify()
 {
-	std::cout << "Simplify" << std::endl;
 	triangulate();
-	unifyEdge(halfedges[halfedges.size() - 1]);
+	if (!unifyEdge(halfedges[5], COLLAPSE_AVERAGE))
+	{
+		std::cerr << "Failed simplification" << std::endl;
+	}
+	std::cerr << vertices.size() << " Vertices" << std::endl;
+	std::cerr << faces.size() << " Faces" << std::endl;
+	std::cerr << halfedges.size() << " Half edges" << std::endl;
+
+	resetOriginOf();
 }
 
-void myMesh::unifyEdge(myHalfedge* he)
+void myMesh::resetOriginOf()
+{
+	for (myHalfedge* he : halfedges)
+	{
+		he->source->originof = he;
+	}
+}
+
+void myMesh::freeVertex(myVertex* v)
+{
+	if (v->originof)
+	{
+		v->originof->source = nullptr;
+	}
+	for (myHalfedge* he : halfedges)
+	{
+		if (he->source == v)
+		{
+			he->source = nullptr;
+		}
+	}
+
+	vertices.erase(std::remove(vertices.begin(), vertices.end(), v), vertices.end());
+	delete v;
+}
+
+void myMesh::freeHalfEdge(myHalfedge* he)
+{
+	for (myVertex* v : vertices)
+	{
+		if (v->originof == he)
+		{
+			v->originof = nullptr;
+		}
+	}
+
+	for (myHalfedge* m_he : halfedges)
+	{
+		if (m_he->next == he)
+		{
+			m_he->next = nullptr;
+		}
+		if (m_he->prev == he)
+		{
+			m_he->prev = nullptr;
+		}
+		if (m_he->twin == he)
+		{
+			m_he->twin = nullptr;
+		}
+	}
+
+	for (myFace* f : faces)
+	{
+		if (f->adjacent_halfedge == he)
+		{
+			f->adjacent_halfedge = nullptr;
+		}
+	}
+
+	halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), he), halfedges.end());
+	delete he;
+}
+
+void myMesh::freeFace(myFace* f)
+{
+	if (f->adjacent_halfedge)
+	{
+		f->adjacent_halfedge->adjacent_face = nullptr;
+	}
+	for (myHalfedge* he : halfedges)
+	{
+		if (he->adjacent_face == f)
+		{
+			he->adjacent_face = nullptr;
+		}
+	}
+	faces.erase(std::remove(faces.begin(), faces.end(), f), faces.end());
+	delete f;
+}
+
+bool myMesh::unifyEdge(myHalfedge* he, CollapseMode mode)
 {
 	// STEPS
 	// - TODO: Check if unification is possible
@@ -313,14 +405,18 @@ void myMesh::unifyEdge(myHalfedge* he)
 	// - Set new twins to replace deleted half-edges
 	// - Delete vertex, faces & half-edges
 
+	if (he == nullptr) return false;
+	if (he->twin == nullptr) return false;
+	if (he->prev == nullptr) return false;
+	if (he->next == nullptr) return false;
+
 	myHalfedge* twin_A1 = he->prev->twin;
 	myHalfedge* twin_B2 = he->twin->next->twin;
 
 	myHalfedge* twin_1A = he->next->twin;
 	myHalfedge* twin_2B = he->twin->prev->twin;
 
-	myVertex* v_to_delete = he->source;
-	myVertex* v_target = he->next->source;
+	if (!twin_A1 || !twin_1A || !twin_B2 || !twin_2B) return false;
 
 	// Mark half-edges defining the triangles to delete
 	std::vector<myHalfedge*> hes_to_delete =
@@ -328,8 +424,17 @@ void myMesh::unifyEdge(myHalfedge* he)
 		// First triangle
 		he, he->next, he->next->next, 
 		// Second triangle
-		he->twin, he->twin->next, he->twin->next->next 
+		he->twin, he->twin->next, he->twin->next->next
 	};
+
+	for (myHalfedge* current_he : hes_to_delete)
+	{
+		if (!current_he) return false;
+	}
+
+	myVertex* v_to_delete = he->source;
+	myVertex* v_target = he->next->source;
+
 
 	// Use new vertex
 	myHalfedge* current_he = he;
@@ -337,6 +442,7 @@ void myMesh::unifyEdge(myHalfedge* he)
 	{
 		current_he = current_he->twin->next;
 		current_he->source = v_target;
+		current_he->source->originof = current_he;
 	}
 	while (current_he != he);
 
@@ -347,8 +453,40 @@ void myMesh::unifyEdge(myHalfedge* he)
 	twin_B2->twin = twin_2B;
 	twin_2B->twin = twin_B2;
 
+	// Set originof
+	twin_A1->twin->source->originof = twin_A1->twin;
+	twin_B2->source->originof = twin_B2;
+
+	current_he = twin_A1;
+	do
+	{
+		current_he->source = v_target;
+		current_he->twin->source->originof = current_he->twin;
+		current_he = current_he->twin->next;
+	}
+	while (current_he != twin_A1);
+	v_target->originof = twin_A1;
+
+	// Move vertex
+	if (mode == COLLAPSE_START)
+	{
+		v_target->point->X = v_to_delete->point->X;
+		v_target->point->Y = v_to_delete->point->Y;
+		v_target->point->Z = v_to_delete->point->Z;
+	}
+	else if (mode == COLLAPSE_AVERAGE)
+	{
+		v_target->point->X = (v_target->point->X + v_to_delete->point->X) / 2;
+		v_target->point->Y = (v_target->point->Y + v_to_delete->point->Y) / 2;
+		v_target->point->Z = (v_target->point->Z + v_to_delete->point->Z) / 2;
+	}
+	else if (mode == COLLAPSE_END)
+	{
+
+	}
+
 	// Delete old data
-	vertices.erase(std::remove(vertices.begin(), vertices.end(), v_to_delete), vertices.end());
+	freeVertex(v_to_delete);
 	std::vector<myFace*> faces_to_delete = {};
 
 	for (myHalfedge* he_to_delete : hes_to_delete)
@@ -359,16 +497,15 @@ void myMesh::unifyEdge(myHalfedge* he)
 		{
 			faces_to_delete.push_back(f);
 		}
-
-		halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), he_to_delete), halfedges.end());
-		delete he_to_delete;
+		freeHalfEdge(he_to_delete);
 	}
 
 	for (myFace* f : faces_to_delete)
 	{
-		faces.erase(std::remove(faces.begin(), faces.end(), f), faces.end());
-		delete f;
+		freeFace(f);
 	}
+
+	return true;
 }
  
 //return false if already triangle, true othewise.
@@ -394,6 +531,11 @@ bool myMesh::triangulate(myFace *f)
 	while (he != f->adjacent_halfedge);
 	center /= count;
 
+	// Create a new vertex at the center
+	myVertex* center_vertex = new myVertex;
+	center_vertex->point = new myPoint3D(center);
+	vertices.push_back(center_vertex);
+
 	// Store the original half-edges
 	std::vector<myHalfedge*> original_halfedges;
 	he = f->adjacent_halfedge;
@@ -404,11 +546,6 @@ bool myMesh::triangulate(myFace *f)
 	} 
 	while (he != f->adjacent_halfedge);
 
-	// Create a new vertex at the center
-	myVertex* center_vertex = new myVertex;
-	center_vertex->point = new myPoint3D(center);
-	vertices.push_back(center_vertex);
-
 	// Store new half-edges
 	std::vector<myHalfedge*> hes_to_center;
 	std::vector<myHalfedge*> hes_from_center;
@@ -416,7 +553,6 @@ bool myMesh::triangulate(myFace *f)
 	// Create new faces and half-edges
 	for (myHalfedge* he : original_halfedges)
 	{
-		// Create new half-edges
 		myHalfedge* he_from_center = new myHalfedge;
 		myHalfedge* he_to_center = new myHalfedge;
 
@@ -430,6 +566,7 @@ bool myMesh::triangulate(myFace *f)
 		he_from_center->adjacent_face = new_face;
 		he_to_center->adjacent_face = new_face;
 
+		//TODO: Fix non sense (inverted hes)
 		he_to_center->source = he->next->source;
 		he_to_center->source->originof = he_to_center;
 		he_to_center->next = he_from_center;
@@ -463,26 +600,6 @@ bool myMesh::triangulate(myFace *f)
 
 	int i = 0;
 	for (myHalfedge* he : halfedges) he->index = i++;
-	return true;
-
-	// Validate
-	i = 0;
-	for (myFace* face : faces)
-	{
-		face->index = i++;
-		std::cout << "Face " << face->index << ":" << std::endl;
-
-		int j = 0;
-		myHalfedge* he = face->adjacent_halfedge;
-		do
-		{
-			std::cout << "- edge " << he->index  << std::endl;
-			he = he->next;
-		}
-		while (he != face->adjacent_halfedge && j++ < 10);
-		std::cout << std::endl << std::endl;
-	}
-
 	return true;
 }
 

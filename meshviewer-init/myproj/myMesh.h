@@ -8,6 +8,8 @@
 
 #include <map>
 
+enum CollapseMode { COLLAPSE_START, COLLAPSE_END, COLLAPSE_AVERAGE };
+
 class myMesh
 {
 public:
@@ -35,8 +37,12 @@ public:
 	void clear();
 
 	void simplify();
-	void unifyEdge(myHalfedge* he);
+	bool unifyEdge(myHalfedge* he, CollapseMode mode);
+	void resetOriginOf();
 
+	void freeVertex(myVertex* v);
+	void freeHalfEdge(myHalfedge* he);
+	void freeFace(myFace* f);
 	myMesh(void);
 	~myMesh(void);
 };

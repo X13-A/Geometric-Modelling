@@ -24,6 +24,9 @@ public:
 	void computeNormals();
 	void normalize();
 
+	void generateFromCurve();
+	void linkCurves(std::vector<myVertex*> vertices1, std::vector<myVertex*> vertices2);
+
 	void subdivisionCatmullClark();
 
 	void splitFaceTRIS(myFace *, myPoint3D *);
@@ -38,9 +41,13 @@ public:
 
 	void simplify();
 	bool unifyEdge(myHalfedge* he, CollapseMode mode);
+	bool unifyEdgeTriangle(myHalfedge* he, CollapseMode mode);
 	void resetOriginOf();
+	myHalfedge* getShortestValidEdgeNonTriangle();
+	myHalfedge* getShortestValidEdge();
 
 	void freeVertex(myVertex* v);
+	void freePoint(myPoint3D* v);
 	void freeHalfEdge(myHalfedge* he);
 	void freeFace(myFace* f);
 	myMesh(void);

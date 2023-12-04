@@ -18,13 +18,15 @@ public:
 
   myPoint3D();
 
+  myPoint3D(const myPoint3D& p);
+
+  bool operator<(const myPoint3D& other) const;
   myPoint3D(double x, double y, double z);
   double dist(myPoint3D p1);
   myPoint3D operator+(myVector3D & v1);
   myPoint3D operator+(myPoint3D & v1);
   myPoint3D & operator+=(myVector3D & v1);
   myPoint3D & operator+=(myPoint3D & v1);
-
   myPoint3D & operator/=(double d);
   myPoint3D & operator*=(double d);
 
@@ -37,6 +39,7 @@ public:
   double dist(myPoint3D *p1, myPoint3D *p2);
   double dist(myPoint3D *p1, myPoint3D *p2, myPoint3D *p3);
   void circumcenter(myPoint3D *p1, myPoint3D *p2, myPoint3D *p3, myPoint3D *p4);
+  void copyValuesFrom(const myPoint3D& p);
 };
 
 #endif

@@ -47,7 +47,7 @@ enum { VAO_TRIANGLES_NORMSPERVERTEX = 0, VAO_TRIANGLES_NORMSPERFACE, VAO_EDGES, 
 
 
 bool smooth = false; //smooth = true means smooth normals, default false means face-wise normals.
-bool drawmesh = false;
+bool drawmesh = true;
 bool drawwireframe = true;
 bool drawmeshvertices = false;
 bool drawsilhouette = false;
@@ -310,7 +310,7 @@ void makeBuffers(myMesh* input_mesh)
 	vector <GLuint> indices_edges;
 	for (unsigned int i = 0; i < input_mesh->halfedges.size(); i++)
 	{
-		if (input_mesh->halfedges[i] == NULL || input_mesh->halfedges[i]->next->next == NULL) continue;
+		if (input_mesh->halfedges[i] == NULL || input_mesh->halfedges[i]->next == NULL || input_mesh->halfedges[i]->next->next == NULL) continue;
 		indices_edges.push_back(input_mesh->halfedges[i]->source->index);
 		indices_edges.push_back(input_mesh->halfedges[i]->next->source->index);
 	}
@@ -635,6 +635,11 @@ void mouseWheel(int button, int dir, int x, int y)
 //This function is called when an arrow key is pressed.
 void keyboard2(int key, int x, int y) {
 	switch (key) {
+	case GLUT_KEY_CTRL_L:
+		m->simplify();
+		m->checkMesh();
+		m->computeNormals();
+		makeBuffers(m);
 	case GLUT_KEY_UP:
 		camera_eye += camera_forward * 0.01;
 		break;
@@ -719,7 +724,7 @@ void initInterface(int argc, char* argv[])
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
 
-	glClearColor(1, 1, 1, 0);
+	glClearColor(1, 1, 1, 1);
 
 	glEnable(GL_MULTISAMPLE);
 

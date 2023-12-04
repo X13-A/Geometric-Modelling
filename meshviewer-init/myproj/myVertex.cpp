@@ -22,15 +22,10 @@ void myVertex::computeNormal()
 	myVector3D n = myVector3D(0, 0, 0);
 
 	// Iterate adjacent faces
-
 	int i = 0;
 	myHalfedge* current_he = originof;
 	do
 	{
-		if ((uintptr_t)current_he == 0xDDDDDDDDD)
-		{
-			break;
-		}
 		if (!current_he) break;
 		if (!current_he->twin) break;
 		if (!current_he->adjacent_face) break;

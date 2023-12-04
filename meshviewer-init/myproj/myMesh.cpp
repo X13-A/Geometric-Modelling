@@ -6,6 +6,10 @@
 #include <utility>
 #include <GL/glew.h>
 #include "myvector3d.h"
+#include <stdlib.h>
+#include <set>
+#include <iostream>
+#include <algorithm>
 
 using namespace std;
 
@@ -33,45 +37,376 @@ void myMesh::clear()
 
 void myMesh::checkMesh()
 {
-	vector<myHalfedge *>::iterator it;
+	int null_next = 0;
+	int null_prev = 0;
+	int null_twin = 0;
+	int null_face = 0;
+	int null_source = 0;
+	int incoherent_next = 0;
+	int incoherent_prev = 0;
+	int incoherent_twin = 0;
 
-	int twin_errors = 0;
-	int next_errors = 0;
-	int prev_errors = 0;
-	int source_errors = 0;
-	int adjacent_face_errors = 0;
+	for (myHalfedge* he : halfedges)
+	{
+		if (he->twin == nullptr) null_twin++;
+		if (he->next == nullptr) null_next++;
+		if (he->prev == nullptr) null_prev++;
+		if (he->source == nullptr) null_source++;
+		if (he->adjacent_face == nullptr) null_face++;
+		if (he->next->prev != he) incoherent_next++;
+		if (he->prev->next != he) incoherent_prev++;
+		if (he->twin && he->twin->twin != he) incoherent_twin++;
+	}
 
-	for (it = halfedges.begin(); it != halfedges.end(); it++)
+	int null_originof = 0;
+	int incoherent_originof = 0;
+
+	for (myVertex* v : vertices)
 	{
-		if ((*it)->twin == NULL) twin_errors++;
-		if ((*it)->next == NULL) next_errors++;
-		if ((*it)->prev == NULL) prev_errors++;
-		if ((*it)->source == NULL) source_errors++;
-		if ((*it)->adjacent_face == NULL) adjacent_face_errors++;
+		if (v->originof == nullptr) null_originof++;
+		if (v->originof != nullptr && v->originof->source != v) incoherent_originof++;
 	}
-	if (twin_errors != 0)
+
+	int incoherent_face_next_prev = 0;
+	for (myFace* face : faces)
 	{
-		std::cout << "Error! Not all edges have their twin (" << twin_errors << ")!\n";
+		int nexts = 0;
+		myHalfedge* he = face->adjacent_halfedge;
+		do
+		{
+			he = he->next;
+			nexts++;
+		} while (he != face->adjacent_halfedge);
+
+		int prevs = 0;
+		he = face->adjacent_halfedge;
+		do
+		{
+			he = he->prev;
+			prevs++;
+		} while (he != face->adjacent_halfedge);
+
+		if (nexts != prevs) incoherent_face_next_prev++;
 	}
-	if (next_errors != 0)
+
+	// Check if sources are ok
+	int duplicate_source_in_triangle_count = 0;
+	for (myHalfedge* he : halfedges)
 	{
-		std::cout << "Error! Not all edges have their next (" << next_errors << ")!\n";
+		if (he->source == he->next->source)
+		{
+			duplicate_source_in_triangle_count++;
+		}
 	}
-	if (prev_errors != 0)
+
+	// Check if all faces are closed
+	int he_count = 0;
+	for (myFace* face : faces)
 	{
-		std::cout << "Error! Not all edges have their prev (" << prev_errors << ")!\n";
+		myHalfedge* he = face->adjacent_halfedge;
+		do
+		{
+			he_count++;
+			he = he->next;
+		} while (he != face->adjacent_halfedge);
 	}
-	if (source_errors != 0)
+
+	int he_delta = he_count - halfedges.size();
+	if (he_delta != 0)
 	{
-		std::cout << "Error! Not all edges have their source (" << source_errors << ")!\n";
+		std::cout << "Warning! Incoherent half-edge number (" << he_delta << ")" << std::endl;
 	}
-	if (adjacent_face_errors != 0)
+	if (duplicate_source_in_triangle_count != 0)
 	{
-		std::cout << "Error! Not all edges have their adjacent_face (" << adjacent_face_errors << ")!\n";
+		std::cerr << "Warning! Some halfedges have the same source than their next (" << duplicate_source_in_triangle_count << ")!" << std::endl;
 	}
-	if (twin_errors + next_errors + prev_errors + source_errors + adjacent_face_errors == 0) std::cout << "Each edge is set!\n";
+	if (null_next != 0)
+	{
+		std::cout << "Warning! Not all edges have their next (" << null_next << ")!\n";
+	}
+	if (null_prev != 0)
+	{
+		std::cout << "Warning! Not all edges have their prev (" << null_prev << ")!\n";
+	}
+	if (null_twin != 0)
+	{
+		std::cout << "Warning! Not all edges have their twin (" << null_twin << ")!\n";
+	}
+	if (null_face != 0)
+	{
+		std::cout << "Warning! Not all edges have their face (" << null_face << ")!\n";
+	}
+	if (null_source != 0)
+	{
+		std::cout << "Warning! Not all edges have their source (" << null_source << ")!\n";
+	}
+	if (incoherent_next != 0)
+	{
+		std::cout << "Warning! Incoherent next (" << incoherent_next << ")!\n";
+	}
+	if (incoherent_prev != 0)
+	{
+		std::cout << "Warning! Incoherent prev (" << incoherent_prev << ")!\n";
+	}
+	if (incoherent_twin != 0)
+	{
+		std::cout << "Warning! Incoherent twin (" << incoherent_twin << ")!\n";
+	}
+	if (null_originof != 0)
+	{
+		std::cout << "Warning! Not all vertices have their originof (" << null_originof << ")!\n";
+	}
+	if (incoherent_originof != 0)
+	{
+		std::cout << "Warning! Incoherent originof (" << incoherent_originof << ")!\n";
+	}
+	if (incoherent_face_next_prev != 0)
+	{
+		std::cout << "Warning! Some faces's nexts and prevs don't make sense (" << incoherent_face_next_prev << ")!\n";
+	}
+	if (null_next + null_prev + null_twin + null_face + null_source + incoherent_next + incoherent_prev + incoherent_twin + null_originof + incoherent_originof + incoherent_face_next_prev == 0) std::cout << "Each edge is set!\n";
 }
 
+float degreesToRadians(float degrees) 
+{
+	return degrees * (3.14159265359 / 180.0);
+}
+
+myPoint3D getRotatedPoint(const myPoint3D& origin, const myPoint3D& p, float theta) 
+{
+	// Step 1: Translate point p to the origin
+	float translatedX = p.X - origin.X;
+	float translatedZ = p.Z - origin.Z;
+
+	// Step 2: Rotate the point around the Y axis
+	float rotatedX = translatedX * cos(theta) - translatedZ * sin(theta);
+	float rotatedZ = translatedX * sin(theta) + translatedZ * cos(theta);
+
+	// Step 3: Translate the point back
+	myPoint3D rotatedPoint;
+	rotatedPoint.X = rotatedX + origin.X;
+	rotatedPoint.Y = p.Y; // y coordinate remains unchanged
+	rotatedPoint.Z = rotatedZ + origin.Z;
+
+	return rotatedPoint;
+}
+
+
+std::vector<myVertex*> createVerticesFromPoints(std::vector<myPoint3D> points)
+{
+	std::vector<myVertex*> vertices;
+	for (int i = 0; i < points.size(); i++)
+	{
+		myVertex* v = new myVertex();
+		v->point = new myPoint3D(points.at(i));
+		vertices.push_back(v);
+	}
+	return vertices;
+}
+
+
+double clamp(double value, double min, double max)
+{
+	return std::max(std::min(value, max), min);
+}
+
+double smoothstep(double edge0, double edge1, double x) 
+{
+	x = clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+	return x * x * (3 - 2 * x);
+}
+
+void myMesh::generateFromCurve()
+{
+	int height = 100;
+	int n = 50;
+	if (n <= 0) return;
+
+	std::vector<myPoint3D> curve;
+	for (size_t i = 0; i < height; i++)
+	{
+		float x = 0.25f + ((sin(float(i)/4) + 1)/2)/8;
+		float y = -0.5 + float(i)/ height;
+		float z = 0;
+		curve.push_back(myPoint3D(x, y ,z));
+	}
+
+	// Create first curve vertices
+	std::vector<std::vector<myVertex*>> curves_vertices = { createVerticesFromPoints(curve) };
+
+	for (int i = 1; i < n; i++)
+	{
+		// Get new curve by rotating the original
+		std::vector<myPoint3D> next_curve;
+		for (int j = 0; j < curve.size(); j++)
+		{
+			next_curve.push_back(getRotatedPoint(myPoint3D(0, 0, 0), curve[j], degreesToRadians(360.0) * i / n));
+		}
+
+		std::vector<myVertex*> current_curve_vertices = curves_vertices.back();
+		std::vector<myVertex*> next_curve_vertices = createVerticesFromPoints(next_curve);
+
+		linkCurves(current_curve_vertices, next_curve_vertices);
+		curves_vertices.push_back(next_curve_vertices);
+	}
+	linkCurves(curves_vertices.back(), curves_vertices[0]);
+}
+
+void myMesh::linkCurves(std::vector<myVertex*> vertices1, std::vector<myVertex*> vertices2)
+{
+	// Set shortest and longest vector
+	std::vector<myVertex*> shortest_vector;
+	std::vector<myVertex*> longest_vector;
+
+	if (vertices1.size() > vertices2.size())
+	{
+		longest_vector = vertices1;
+		shortest_vector = vertices2;
+	}
+	else
+	{
+		longest_vector = vertices2;
+		shortest_vector = vertices1;
+	}
+
+	// Triangulate
+	myHalfedge* last_boundary_edge = nullptr;
+	myVertex* last_shortest_vector_vertex = shortest_vector[shortest_vector.size() - 1];
+	for (int i = 0; i < longest_vector.size(); i++)
+	{
+		if (i < shortest_vector.size() - 1)
+		{
+			// Create first triangle
+			myHalfedge* he1 = new myHalfedge;
+			myHalfedge* he2 = new myHalfedge;
+			myHalfedge* he3 = new myHalfedge;
+
+			he1->source = shortest_vector[i];
+			shortest_vector[i]->originof = he1;
+
+			he2->source = longest_vector[i + 1];
+			longest_vector[i + 1]->originof = he2;
+
+			he3->source = longest_vector[i];
+			longest_vector[i]->originof = he3;
+
+			he1->next = he2;
+			he2->prev = he1;
+
+			he2->next = he3;
+			he3->prev = he2;
+
+			he3->next = he1;
+			he1->prev = he3;
+
+			// Set first face
+			myFace* face1 = new myFace();
+			face1->adjacent_halfedge = he1;
+			he1->adjacent_face = face1;
+			he2->adjacent_face = face1;
+			he3->adjacent_face = face1;
+
+			// Create second triangle
+			myHalfedge* he4 = new myHalfedge;
+			myHalfedge* he5 = new myHalfedge;
+			myHalfedge* he6 = new myHalfedge;
+
+			he4->source = shortest_vector[i];
+			shortest_vector[i]->originof = he4;
+
+			he5->source = shortest_vector[i + 1];
+			shortest_vector[i + 1]->originof = he5;
+
+			he6->source = longest_vector[i + 1];
+			longest_vector[i + 1]->originof = he6;
+
+			he4->next = he5;
+			he5->prev = he4;
+
+			he5->next = he6;
+			he6->prev = he5;
+
+			he6->next = he4;
+			he4->prev = he6;
+
+			// Set second face
+			myFace* face2 = new myFace();
+			face2->adjacent_halfedge = he4;
+			he4->adjacent_face = face2;
+			he5->adjacent_face = face2;
+			he6->adjacent_face = face2;
+
+			// Set twins
+			he1->twin = he6;
+			he6->twin = he1;
+
+			if (last_boundary_edge != nullptr)
+			{
+				he4->twin = last_boundary_edge;
+				last_boundary_edge->twin = he4;
+			}
+			last_boundary_edge = he4;
+
+			// Store new edges and faces
+			faces.push_back(face1);
+			faces.push_back(face2);
+			halfedges.push_back(he1);
+			halfedges.push_back(he2);
+			halfedges.push_back(he3);
+			halfedges.push_back(he4);
+			halfedges.push_back(he5);
+			halfedges.push_back(he6);
+		}
+		else if (i < longest_vector.size() - 1)
+		{
+			// Create triangle
+			myHalfedge* he1 = new myHalfedge;
+			myHalfedge* he2 = new myHalfedge;
+			myHalfedge* he3 = new myHalfedge;
+
+			he1->source = last_shortest_vector_vertex;
+			last_shortest_vector_vertex->originof = he1;
+
+			he2->source = longest_vector[i + 1];
+			longest_vector[i + 1]->originof = he2;
+
+			he3->source = longest_vector[i];
+			longest_vector[i]->originof = he3;
+
+			he1->next = he2;
+			he2->prev = he1;
+
+			he2->next = he3;
+			he3->prev = he2;
+
+			he3->next = he1;
+			he1->prev = he3;
+
+			// Set face
+			myFace* face = new myFace();
+			face->adjacent_halfedge = he1;
+			he1->adjacent_face = face;
+			he2->adjacent_face = face;
+			he3->adjacent_face = face;
+
+			// Set twins
+			if (last_boundary_edge != nullptr)
+			{
+				he3->twin = last_boundary_edge;
+				last_boundary_edge->twin = he3;
+			}
+			last_boundary_edge = he1;
+
+			// Store edges and face
+			faces.push_back(face);
+			halfedges.push_back(he1);
+			halfedges.push_back(he2);
+			halfedges.push_back(he3);
+		}
+	}
+	vertices.insert(vertices.end(), vertices1.begin(), vertices1.end());
+	vertices.insert(vertices.end(), vertices2.begin(), vertices2.end());
+}
 
 bool myMesh::readFile(std::string filename)
 {
@@ -211,7 +546,6 @@ bool myMesh::readFile(std::string filename)
 	return true;
 }
 
-
 void myMesh::computeNormals()
 {
 	// Faces
@@ -277,9 +611,297 @@ void myMesh::splitFaceQUADS(myFace *f, myPoint3D *p)
 	/**** TODO ****/
 }
 
+std::set<myVertex*> getFaceVertices(myFace* face)
+{
+	std::set<myVertex*> vertices;
+	myHalfedge* he = face->adjacent_halfedge;
+	do
+	{
+		vertices.insert(he->source);
+		he = he->next;
+	} while (he != face->adjacent_halfedge);
+	return vertices;
+}
+
+std::set<myFace*> getNeighborFaces(myVertex* v)
+{
+	std::set<myFace*> faces;
+
+	myHalfedge* current_he = v->originof;
+	do
+	{
+		faces.insert(current_he->adjacent_face);
+		current_he = current_he->twin->next;
+	} 
+	while (current_he != v->originof);
+
+	return faces;
+}
+
+std::set<myHalfedge*> getNeighborEdges(myVertex* v)
+{
+	std::set<myHalfedge*> edges;
+
+	myHalfedge* current_he = v->originof;
+	do
+	{
+		edges.insert(current_he);
+		current_he = current_he->twin->next;
+	} while (current_he != v->originof);
+
+	return edges;
+}
+
+myPoint3D getAveragePoint(std::set<myPoint3D> points)
+{
+	myPoint3D res = myPoint3D(0, 0, 0);
+	for (myPoint3D p : points)
+	{
+		res += p;
+	}
+	res /= static_cast<double>(points.size());
+	return res;
+}
+
+myPoint3D getAveragePoint(std::set<myVertex*> vertices)
+{
+	std::set<myPoint3D> points;
+	for (myVertex* v : vertices)
+	{
+		points.insert(*(v->point));
+	}
+	return getAveragePoint(points);
+}
+
+myPoint3D getBarycenter(myPoint3D a, myPoint3D b, myPoint3D c, double wa, double wb, double wc, int n)
+{
+	return (a * wa + b * wb + c * wc) / n;
+}
+
+/// <summary>
+/// https://en.wikipedia.org/wiki/Catmull%E2%80%93Clark_subdivision_surface
+/// </summary>
 void myMesh::subdivisionCatmullClark()
 {
-	/**** TODO ****/
+	//TODO: Check source, originof, next, prev, twin, adjacent_face, adjacent_he
+
+	std::map<myFace*, myVertex*> face_vertex_map;
+	std::map<myHalfedge*, myVertex*> edge_vertex_map;
+	std::map <std::pair<myVertex*, myVertex*>, myHalfedge*> he_map;
+
+	std::vector<myHalfedge*> new_edges;
+	std::vector<myFace*> new_faces;
+	std::vector<myVertex*> new_vertices;
+
+	// Generate face points
+	for (myFace* face : faces)
+	{
+		std::set<myVertex*> face_vertices = getFaceVertices(face);
+		myVertex* face_vertex = new myVertex();
+		face_vertex->point = new myPoint3D((getAveragePoint(face_vertices)));
+		face_vertex_map.insert(std::pair<myFace*, myVertex*>(face, face_vertex));
+		new_vertices.push_back(face_vertex);
+	}
+
+	// Generate edge points
+	for (myHalfedge* he : halfedges)
+	{
+		if (he < he->twin) // Avoid duplicate vertices
+		{
+			std::set<myVertex*> vertices_used;
+			vertices_used.insert(face_vertex_map.at(he->adjacent_face));
+			vertices_used.insert(face_vertex_map.at(he->twin->adjacent_face));
+			vertices_used.insert(he->source);
+			vertices_used.insert(he->twin->source);
+
+			myVertex* edge_vertex = new myVertex();
+			edge_vertex->point = new myPoint3D(getAveragePoint(vertices_used));
+			edge_vertex_map.insert(std::pair<myHalfedge*, myVertex*>(he, edge_vertex));
+			edge_vertex_map.insert(std::pair<myHalfedge*, myVertex*>(he->twin, edge_vertex));
+			new_vertices.push_back(edge_vertex);
+		}
+	}
+
+	// Average original points
+	for (myVertex* v : vertices)
+	{
+		std::set<myFace*> neighbor_faces = getNeighborFaces(v);
+		std::set<myHalfedge*> neighbor_edges = getNeighborEdges(v);
+
+		// Average of face vertices
+		std::set<myVertex*> face_vertices;
+		for (myFace* f : neighbor_faces)
+		{
+			face_vertices.insert(face_vertex_map.at(f));
+		}
+		myPoint3D avg_faces = getAveragePoint(face_vertices);
+
+		// Average of edge vertices
+		std::set<myPoint3D> edge_middle_points;
+		for (myHalfedge* he : neighbor_edges)
+		{
+			std::set<myPoint3D> he_points;
+			he_points.insert(*(he->source->point));
+			he_points.insert(*(he->twin->source->point));
+			edge_middle_points.insert(getAveragePoint(he_points));
+		}
+		myPoint3D avg_edges = getAveragePoint(edge_middle_points);
+
+		// Average point
+		int n = neighbor_faces.size();
+		myPoint3D barycenter = getBarycenter(avg_faces, avg_edges, *(v->point), 1, 2, n - 3, n);
+		
+		if (barycenter.dist(myPoint3D(0, 0, 0)) > 1.0)
+		{
+			std::cout << "breakpoint" << std::endl;
+		}
+
+		v->point->copyValuesFrom(barycenter);		
+
+	}
+
+	// Create edgeVertex <-> faceVertex half edges
+	for (std::pair<myFace*, myVertex*> f_v_pair : face_vertex_map)
+	{
+		myFace* face = f_v_pair.first;
+		myVertex* face_vertex = f_v_pair.second;
+
+		std::set<myVertex*> edge_vertices;
+		for (std::pair<myHalfedge*, myVertex*> he_v_pair : edge_vertex_map)
+		{
+			myHalfedge* he = he_v_pair.first;
+			myVertex* edge_vertex = he_v_pair.second;
+
+			if (he->adjacent_face == face)
+			{
+				edge_vertices.insert(edge_vertex);
+			}
+		}
+		
+		for (myVertex* edge_vertex : edge_vertices)
+		{
+			myHalfedge* he_from_face_vertex = new myHalfedge();
+			he_from_face_vertex->source = face_vertex;
+			face_vertex->originof = he_from_face_vertex;
+
+			myHalfedge* he_to_face_vertex = new myHalfedge();
+			he_to_face_vertex->source = edge_vertex;
+			edge_vertex->originof = he_to_face_vertex;
+
+			he_from_face_vertex->twin = he_to_face_vertex;
+			he_to_face_vertex->twin = he_from_face_vertex;
+
+			// Fill map
+			auto mapping1 = make_pair(make_pair(face_vertex, edge_vertex), he_from_face_vertex);
+			auto mapping2 = make_pair(make_pair(edge_vertex, face_vertex), he_to_face_vertex);
+
+			he_map.insert(mapping1);
+			he_map.insert(mapping2);
+
+			new_edges.push_back(he_from_face_vertex);
+			new_edges.push_back(he_to_face_vertex);
+		}
+	}
+	
+	// Create originalVertex <-> edgeVertex half edges
+	for (myVertex* original_v : vertices)
+	{
+		std::set<myVertex*> edge_vertices;
+		for (myHalfedge* he : halfedges)
+		{
+			if (he->source == original_v)
+			{
+				edge_vertices.insert(edge_vertex_map.at(he));
+			}
+		}
+		
+		for (myVertex* edge_vertex : edge_vertices)
+		{
+			myHalfedge* he_to_edge = new myHalfedge();
+			he_to_edge->source = original_v;
+			original_v->originof = he_to_edge;
+
+			myHalfedge* he_from_edge = new myHalfedge();
+			he_from_edge->source = edge_vertex;
+			edge_vertex->originof = he_from_edge;
+
+			he_to_edge->twin = he_from_edge;
+			he_from_edge->twin = he_to_edge;
+
+			// Fill map
+			auto mapping1 = make_pair(make_pair(original_v, edge_vertex), he_to_edge);
+			auto mapping2 = make_pair(make_pair(edge_vertex, original_v), he_from_edge);
+
+			he_map.insert(mapping1);
+			he_map.insert(mapping2);
+
+			new_edges.push_back(he_from_edge);
+			new_edges.push_back(he_to_edge);
+		}
+	}
+
+	// Connect all half edges
+	for (myFace* face : faces)
+	{
+		myHalfedge* current_he = face->adjacent_halfedge;
+		do
+		{
+			myVertex* face_vertex = face_vertex_map.at(face);
+			myVertex* original_vertex = current_he->source;
+			myVertex* edge_vertex = edge_vertex_map.at(current_he);
+			myVertex* prev_edge_vertex = edge_vertex_map.at(current_he->prev);
+
+			// Connect edges
+			he_map.at(make_pair(original_vertex, edge_vertex))->next = he_map.at(make_pair(edge_vertex, face_vertex));
+			he_map.at(make_pair(edge_vertex, face_vertex))->prev = he_map.at(make_pair(original_vertex, edge_vertex));
+
+			he_map.at(make_pair(edge_vertex, face_vertex))->next = he_map.at(make_pair(face_vertex, prev_edge_vertex));
+			he_map.at(make_pair(face_vertex, prev_edge_vertex))->prev = he_map.at(make_pair(edge_vertex, face_vertex));
+
+			he_map.at(make_pair(face_vertex, prev_edge_vertex))->next = he_map.at(make_pair(prev_edge_vertex, original_vertex));
+			he_map.at(make_pair(prev_edge_vertex, original_vertex))->prev = he_map.at(make_pair(face_vertex, prev_edge_vertex));
+
+			he_map.at(make_pair(prev_edge_vertex, original_vertex))->next = he_map.at(make_pair(original_vertex, edge_vertex));
+			he_map.at(make_pair(original_vertex, edge_vertex))->prev = he_map.at(make_pair(prev_edge_vertex, original_vertex));
+
+			// Create face
+			myFace* new_face = new myFace();
+			he_map.at(make_pair(original_vertex, edge_vertex))->adjacent_face = new_face;
+			he_map.at(make_pair(edge_vertex, face_vertex))->adjacent_face = new_face;
+			he_map.at(make_pair(face_vertex, prev_edge_vertex))->adjacent_face = new_face;
+			he_map.at(make_pair(prev_edge_vertex, original_vertex))->adjacent_face = new_face;
+			new_face->adjacent_halfedge = he_map.at(make_pair(original_vertex, edge_vertex));
+			new_faces.push_back(new_face);
+
+			current_he = current_he->next;
+		}
+		while (current_he != face->adjacent_halfedge);
+	}
+
+	// Remove old halfedges and faces
+	for (myFace* f : faces)
+	{
+		freeFace(f);
+	}
+	faces.clear();
+
+	for (myHalfedge* he : halfedges)
+	{
+		freeHalfEdge(he);
+	}
+	halfedges.clear();
+	
+	vertices.insert(vertices.end(), new_vertices.begin(), new_vertices.end());
+	faces = new_faces;
+	halfedges = new_edges;
+	checkMesh();
+}
+
+bool isTriangle(myFace* f)
+{
+	// Check if face is a triangle
+	if (f == nullptr || f->adjacent_halfedge == nullptr || f->adjacent_halfedge->next == nullptr || f->adjacent_halfedge->next->next == nullptr || f->adjacent_halfedge->next->next->next == nullptr) return false;
+	return f->adjacent_halfedge->next->next->next == f->adjacent_halfedge;
 }
 
 void myMesh::triangulate()
@@ -300,18 +922,108 @@ void myMesh::triangulate()
 	checkMesh();
 }
 
+myHalfedge* myMesh::getShortestValidEdgeNonTriangle()
+{
+	double min = INFINITY;
+	myHalfedge* min_he = nullptr;
+	int min_n_edges = INFINITY;
+	for (myHalfedge* he : halfedges)
+	{
+		// Check if face is a triangle
+		int n_edges = 0;
+		bool is_valid = true;
+		myHalfedge* current_he = he;
+		do 
+		{
+			if (current_he->twin == nullptr)
+			{
+				is_valid = false;
+				break;
+			}
+			current_he = current_he->next;
+			n_edges++;
+		}
+		while (current_he != he);
+
+		// Check if twin face is a triangle
+		int n_twin_edges = 0;
+		current_he = he->twin;
+		do
+		{
+			if (current_he->twin == nullptr)
+			{
+				is_valid = false;
+				break;
+			}
+			current_he = current_he->next;
+			n_twin_edges++;
+		} 
+		while (current_he != he->twin);
+
+		if (!is_valid || n_edges <= 3 || n_twin_edges <= 3) continue;
+
+		myPoint3D* p1 = he->source->point;
+		myPoint3D* p2 = he->twin->source->point;
+
+		double dist = p1->dist(*p2);
+		if (dist < min)
+		{
+			min = dist;
+			min_he = he;
+			min_n_edges = n_edges;
+		}
+	}
+	return min_he;
+}
+
+myHalfedge* myMesh::getShortestValidEdge()
+{
+	double min = INFINITY;
+	myHalfedge* min_he = nullptr;
+	int min_n_edges = INFINITY;
+	for (myHalfedge* he : halfedges)
+	{
+		int n_edges = 0;
+		bool is_valid = true;
+		myHalfedge* current_he = he;
+		do
+		{
+			if (he->twin == nullptr)
+			{
+				is_valid = false;
+				break;
+			}
+			he = he->next;
+			n_edges++;
+		} while (he != current_he);
+
+		if (!is_valid) continue;
+
+		myPoint3D* p1 = he->source->point;
+		myPoint3D* p2 = he->twin->source->point;
+
+		double dist = p1->dist(*p2);
+		if (dist < min)
+		{
+			min = dist;
+			min_he = he;
+			min_n_edges = n_edges;
+		}
+	}
+	return min_he;
+}
+
 void myMesh::simplify()
 {
-	triangulate();
-	if (!unifyEdge(halfedges[5], COLLAPSE_AVERAGE))
+	myHalfedge* shortest_edge = getShortestValidEdge();
+	if (shortest_edge == nullptr || faces.size() < 3)
 	{
-		std::cerr << "Failed simplification" << std::endl;
+		std::cerr << "No polygon left for simplification" << std::endl;
 	}
-	std::cerr << vertices.size() << " Vertices" << std::endl;
-	std::cerr << faces.size() << " Faces" << std::endl;
-	std::cerr << halfedges.size() << " Half edges" << std::endl;
-
-	resetOriginOf();
+	else if (!unifyEdge(shortest_edge, COLLAPSE_AVERAGE))
+	{
+		std::cerr << "Abort simplification because he->source is equal to he->next->source" << std::endl;
+	}
 }
 
 void myMesh::resetOriginOf()
@@ -324,10 +1036,6 @@ void myMesh::resetOriginOf()
 
 void myMesh::freeVertex(myVertex* v)
 {
-	if (v->originof)
-	{
-		v->originof->source = nullptr;
-	}
 	for (myHalfedge* he : halfedges)
 	{
 		if (he->source == v)
@@ -335,9 +1043,20 @@ void myMesh::freeVertex(myVertex* v)
 			he->source = nullptr;
 		}
 	}
-
-	vertices.erase(std::remove(vertices.begin(), vertices.end(), v), vertices.end());
 	delete v;
+}
+
+void myMesh::freePoint(myPoint3D* p)
+{
+
+	for (myVertex* v : vertices)
+	{
+		if (v->point == p)
+		{
+			v->point = nullptr;
+		}
+	}
+	delete p;
 }
 
 void myMesh::freeHalfEdge(myHalfedge* he)
@@ -373,14 +1092,12 @@ void myMesh::freeHalfEdge(myHalfedge* he)
 			f->adjacent_halfedge = nullptr;
 		}
 	}
-
-	halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), he), halfedges.end());
 	delete he;
 }
 
 void myMesh::freeFace(myFace* f)
 {
-	if (f->adjacent_halfedge)
+	if (f->adjacent_halfedge != nullptr)
 	{
 		f->adjacent_halfedge->adjacent_face = nullptr;
 	}
@@ -391,52 +1108,38 @@ void myMesh::freeFace(myFace* f)
 			he->adjacent_face = nullptr;
 		}
 	}
-	faces.erase(std::remove(faces.begin(), faces.end(), f), faces.end());
 	delete f;
 }
 
 bool myMesh::unifyEdge(myHalfedge* he, CollapseMode mode)
 {
-	// STEPS
-	// - TODO: Check if unification is possible
-	// - Mark vertex to delete & new vertex
-	// - Mark half-edges to delete
-	// - Set neighbors source to new vertex
-	// - Set new twins to replace deleted half-edges
-	// - Delete vertex, faces & half-edges
-
-	if (he == nullptr) return false;
-	if (he->twin == nullptr) return false;
-	if (he->prev == nullptr) return false;
-	if (he->next == nullptr) return false;
-
-	myHalfedge* twin_A1 = he->prev->twin;
-	myHalfedge* twin_B2 = he->twin->next->twin;
-
-	myHalfedge* twin_1A = he->next->twin;
-	myHalfedge* twin_2B = he->twin->prev->twin;
-
-	if (!twin_A1 || !twin_1A || !twin_B2 || !twin_2B) return false;
-
-	// Mark half-edges defining the triangles to delete
-	std::vector<myHalfedge*> hes_to_delete =
-	{
-		// First triangle
-		he, he->next, he->next->next, 
-		// Second triangle
-		he->twin, he->twin->next, he->twin->next->next
-	};
-
-	for (myHalfedge* current_he : hes_to_delete)
-	{
-		if (!current_he) return false;
-	}
+	myHalfedge* he_to_delete = he;
+	myHalfedge* twin_to_delete = he->twin;
 
 	myVertex* v_to_delete = he->source;
 	myVertex* v_target = he->next->source;
+	v_target->originof = he->next;
+	
 
+	bool face_is_triangle = he->next->next->next == he;
+	bool twin_is_triangle = he->twin->next->next->next == he->twin;
 
-	// Use new vertex
+	// Use if not willing to simplify triangles
+	//if (face_is_triangle) return false;
+	//if (twin_is_triangle) return false;
+
+	if (v_target == v_to_delete) return false;
+
+	myHalfedge* twin_A1 = he->next->twin;
+	myHalfedge* twin_B2 = he->twin->prev->twin;
+
+	myHalfedge* twin_1A = he->prev->twin;
+	myHalfedge* twin_2B = he->twin->next->twin;
+
+	he->adjacent_face->adjacent_halfedge = he->next;
+	he->twin->adjacent_face->adjacent_halfedge = he->twin->next;
+
+	// Set sources and originofs
 	myHalfedge* current_he = he;
 	do
 	{
@@ -446,26 +1149,14 @@ bool myMesh::unifyEdge(myHalfedge* he, CollapseMode mode)
 	}
 	while (current_he != he);
 
-	// Set new twins
-	twin_A1->twin = twin_1A;
-	twin_1A->twin = twin_A1;
-
-	twin_B2->twin = twin_2B;
-	twin_2B->twin = twin_B2;
-
-	// Set originof
-	twin_A1->twin->source->originof = twin_A1->twin;
+	twin_A1->source->originof = twin_A1;
 	twin_B2->source->originof = twin_B2;
 
-	current_he = twin_A1;
-	do
-	{
-		current_he->source = v_target;
-		current_he->twin->source->originof = current_he->twin;
-		current_he = current_he->twin->next;
-	}
-	while (current_he != twin_A1);
-	v_target->originof = twin_A1;
+	he->prev->next = he->next;
+	he->next->prev = he->prev;
+
+	he->twin->prev->next = he->twin->next;
+	he->twin->next->prev = he->twin->prev;
 
 	// Move vertex
 	if (mode == COLLAPSE_START)
@@ -484,36 +1175,59 @@ bool myMesh::unifyEdge(myHalfedge* he, CollapseMode mode)
 	{
 
 	}
-
-	// Delete old data
-	freeVertex(v_to_delete);
-	std::vector<myFace*> faces_to_delete = {};
-
-	for (myHalfedge* he_to_delete : hes_to_delete)
+	
+	if (face_is_triangle)
 	{
-		// Mark faces for deletion
-		myFace* f = he_to_delete->adjacent_face;
-		if (std::find(faces_to_delete.begin(), faces_to_delete.end(), f) == faces_to_delete.end())
-		{
-			faces_to_delete.push_back(f);
-		}
-		freeHalfEdge(he_to_delete);
+		twin_A1->twin = twin_1A;
+		twin_1A->twin = twin_A1;
+
+		faces.erase(std::remove(faces.begin(), faces.end(), he_to_delete->adjacent_face), faces.end());
+		freeFace(he_to_delete->adjacent_face);
+
+		halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), he_to_delete->next->next), halfedges.end());
+		freeHalfEdge(he_to_delete->next->next);
+
+		halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), he_to_delete->next), halfedges.end());
+		freeHalfEdge(he_to_delete->next);
+	}
+	if (twin_is_triangle)
+	{
+		twin_B2->twin = twin_2B;
+		twin_2B->twin = twin_B2;
+
+		faces.erase(std::remove(faces.begin(), faces.end(), twin_to_delete->adjacent_face), faces.end());
+		freeFace(twin_to_delete->adjacent_face);
+
+		halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), twin_to_delete->next->next), halfedges.end());
+		freeHalfEdge(twin_to_delete->next->next);
+
+		halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), twin_to_delete->next), halfedges.end());
+		freeHalfEdge(twin_to_delete->next);
 	}
 
-	for (myFace* f : faces_to_delete)
+	halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), he_to_delete), halfedges.end());
+	freeHalfEdge(he_to_delete);
+
+	halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), twin_to_delete), halfedges.end());
+	freeHalfEdge(twin_to_delete);
+
+	vertices.erase(std::remove(vertices.begin(), vertices.end(), v_to_delete), vertices.end());
+	freeVertex(v_to_delete);
+
+	// Set originofs 
+	for (myHalfedge* he_to_check : halfedges)
 	{
-		freeFace(f);
+		if (!he_to_check->source) continue;
+		he_to_check->source->originof = he_to_check;
 	}
 
 	return true;
 }
- 
-//return false if already triangle, true othewise.
+
 bool myMesh::triangulate(myFace *f)
 {
 	// Check if face is a triangle
-	if (f == nullptr || f->adjacent_halfedge == nullptr || f->adjacent_halfedge->next == nullptr || f->adjacent_halfedge->next->next == nullptr || f->adjacent_halfedge->next->next->next == nullptr) return false;
-	if (f->adjacent_halfedge->next->next->next == f->adjacent_halfedge)
+	if (isTriangle(f))
 	{
 		return false;
 	}

@@ -13,7 +13,7 @@ uniform int type;
 uniform vec4 kd;
 
 vec4 mylight_position = vec4(0,0,4,1);
-vec4 mylight_color = vec4(1,1,1,0);
+vec4 mylight_color = vec4(1, 1, 1, 0);
 
 void main (void) 
 {        
@@ -34,7 +34,7 @@ void main (void)
 
 	vec3 reflectdir = normalize( reflect(-lightdir, normal) );
 
-    finalcolor =  vec4(0.1,0.1,0.1,0) + 
+    finalcolor =  vec4(0.1,0.1,0.3,0) + 
 					kd * mylight_color * max( dot(lightdir, normal), 0.0) +
 					kd * mylight_color * pow( max( dot(reflectdir, eyedir), 0.0 ), 60 );
     if (type == 1) finalcolor = kd;

@@ -170,10 +170,6 @@ void menu(int item)
 		{
 			m->simplify();
 			m->computeNormals();
-			//m->simplify();
-			//m->computeNormals();
-			//m->simplify();
-			//m->computeNormals();
 			makeBuffers(m);
 		}
 	}
@@ -266,21 +262,21 @@ void display()
 		{
 			// CALCULATE SILHOUETTE
 			myHalfedge *e = (*it);
-			myVertex *v1 = (*it)->source;
+			myVertex *v1 = e->source;
 			if ((*it)->twin == NULL) continue;
 			if ((*it)->adjacent_face == NULL) continue;
 			if ((*it)->twin == NULL) continue;
 			if ((*it)->twin->adjacent_face == NULL) continue;
 
-			myVertex *v2 = (*it)->twin->source;
-			myVector3D normal1 = *(*it)->adjacent_face->normal;
-			myVector3D normal2 = *(*it)->twin->adjacent_face->normal;
+			myVertex *v2 = e->twin->source;
+			myVector3D normal1 = *e->adjacent_face->normal;
+			myVector3D normal2 = *e->twin->adjacent_face->normal;
 
 			myVector3D dir = myVector3D((camera_eye - (*v1->point + *v2->point) / 2));
 			dir.normalize();
 			float dotProd1 = dir.dot(&normal1);
 			float dotProd2 = dir.dot(&normal2);
-			bool highNormalDiff = abs(normal1.dot(&normal2)) <= 0.70710678118f;
+
 			if (dotProd1 * dotProd2 < 0)
 			{
 				silhouette_edges.push_back(v1->index);
@@ -393,15 +389,19 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile("pyramid.obj")) {
-		m->computeNormals();
-		makeBuffers(m);
-	}
+	m->generateFromCurve();
+	m->computeNormals();
+	makeBuffers(m);
+
+	//if (m->readFile("cube.obj")) 
+	//{
+	//}
 }
 
 
 int main(int argc, char* argv[]) 
 {
+	srand(time(NULL));
 	initInterface(argc, argv);
 
 	initMesh();

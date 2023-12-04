@@ -7,11 +7,33 @@ myPoint3D::myPoint3D()
 	X = Y = Z = 0.0;
 }
 
+myPoint3D::myPoint3D(const myPoint3D& p)
+{
+	X = p.X;
+	Y = p.Y;
+	Z = p.Z;
+}
+
 myPoint3D::myPoint3D(double x, double y, double z)
 {
 	X = x;
 	Y = y;
 	Z = z;
+}
+void myPoint3D::copyValuesFrom(const myPoint3D& p)
+{
+	X = p.X;
+	Y = p.Y;
+	Z = p.Z;
+}
+
+bool myPoint3D::operator<(const myPoint3D& other) const
+{
+	if (X < other.X) return true;
+	if (other.X < X) return false;
+	if (Y < other.Y) return true;
+	if (other.Y < Y) return false;
+	return Z < other.Z;
 }
 
 myPoint3D myPoint3D::operator+(myVector3D & v1)

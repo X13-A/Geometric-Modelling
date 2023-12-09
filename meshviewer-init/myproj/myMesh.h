@@ -24,26 +24,23 @@ public:
 	void computeNormals();
 	void normalize();
 
-	void generateFromCurve();
+	void generateFromCurve(std::vector<myPoint3D> curve, int n, int height);
 	void linkCurves(std::vector<myVertex*> vertices1, std::vector<myVertex*> vertices2);
 
 	void subdivisionCatmullClark();
 
 	void splitFaceTRIS(myFace *, myPoint3D *);
-
 	void splitEdge(myHalfedge *, myPoint3D *);
 	void splitFaceQUADS(myFace *, myPoint3D *);
 
 	void triangulate();
-	bool triangulate(myFace *);
+	bool triangulateFace(myFace *);
 
 	void clear();
 
 	void simplify();
 	bool unifyEdge(myHalfedge* he, CollapseMode mode);
 	bool unifyEdgeTriangle(myHalfedge* he, CollapseMode mode);
-	void resetOriginOf();
-	myHalfedge* getShortestValidEdgeNonTriangle();
 	myHalfedge* getShortestValidEdge();
 
 	void freeVertex(myVertex* v);

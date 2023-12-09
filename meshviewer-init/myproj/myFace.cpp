@@ -16,6 +16,10 @@ myFace::~myFace(void)
 	if (normal) delete normal;
 }
 
+
+/// <summary>
+/// Computes and sets the normal of the face
+/// </summary>
 void myFace::computeNormal()
 {
 	myVertex* v1 = adjacent_halfedge->source;

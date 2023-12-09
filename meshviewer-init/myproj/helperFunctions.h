@@ -53,7 +53,7 @@ bool drawmeshvertices = false;
 bool drawsilhouette = false;
 bool drawnormals = false;
 
-//
+// Use this instead of makeBuffers if you want to see face normals
 //void makeBuffersFaceNormals(myMesh *input_mesh)
 //{
 //	vector <GLfloat> verts; verts.clear();

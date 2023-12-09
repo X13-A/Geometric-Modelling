@@ -381,6 +381,23 @@ void display()
 }
 
 
+void create360Curve(myMesh* m)
+{
+	int height = 100;
+	int n = 50;
+	if (n <= 0) return;
+
+	std::vector<myPoint3D> curve;
+	for (size_t i = 0; i < height; i++)
+	{
+		float x = 0.25f + ((sin(float(i) / 4) + 1) / 2) / 8;
+		float y = -0.5 + float(i) / height;
+		float z = 0;
+		curve.push_back(myPoint3D(x, y, z));
+	}
+	m->generateFromCurve(curve, n, height);
+}
+
 void initMesh()
 {
 	pickedpoint = NULL;
@@ -388,14 +405,24 @@ void initMesh()
 	closest_vertex = NULL;
 	closest_face = NULL;
 
-	m = new myMesh();
-	m->generateFromCurve();
-	m->computeNormals();
-	makeBuffers(m);
+	bool create360 = false; // Set to true if you want to test mesh generation from curve
+	bool readSuccess = true;
 
-	//if (m->readFile("cube.obj")) 
-	//{
-	//}
+	m = new myMesh();
+	if (create360)
+	{
+		create360Curve(m);
+	}
+	else
+	{
+		readSuccess = m->readFile("cube.obj");
+	}
+
+	if (readSuccess)
+	{
+		m->computeNormals();
+		makeBuffers(m);
+	}
 }
 
 

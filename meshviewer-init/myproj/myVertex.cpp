@@ -17,6 +17,9 @@ myVertex::~myVertex(void)
 	if (normal) delete normal;
 }
 
+/// <summary>
+/// Computes and sets the normal of the vertex
+/// </summary>
 void myVertex::computeNormal()
 {
 	myVector3D n = myVector3D(0, 0, 0);

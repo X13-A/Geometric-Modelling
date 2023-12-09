@@ -18,12 +18,14 @@ myMesh::myMesh(void)
 	/**** TODO ****/
 }
 
-
 myMesh::~myMesh(void)
 {
 	/**** TODO ****/
 }
 
+/// <summary>
+/// Clears the mesh
+/// </summary>
 void myMesh::clear()
 {
 	for (unsigned int i = 0; i < vertices.size(); i++) if (vertices[i]) delete vertices[i];
@@ -35,6 +37,9 @@ void myMesh::clear()
 	vector<myFace *> empty_faces;         faces.swap(empty_faces);
 }
 
+/// <summary>
+/// Checks mesh consistency
+/// </summary>
 void myMesh::checkMesh()
 {
 	int null_next = 0;
@@ -167,31 +172,39 @@ void myMesh::checkMesh()
 	if (null_next + null_prev + null_twin + null_face + null_source + incoherent_next + incoherent_prev + incoherent_twin + null_originof + incoherent_originof + incoherent_face_next_prev == 0) std::cout << "Each edge is set!\n";
 }
 
+/// <summary>
+/// Converts degrees to radians
+/// </summary>
 float degreesToRadians(float degrees) 
 {
 	return degrees * (3.14159265359 / 180.0);
 }
 
+/// <summary>
+/// Rotates a point around a given origin (Y axis)
+/// </summary>
 myPoint3D getRotatedPoint(const myPoint3D& origin, const myPoint3D& p, float theta) 
 {
-	// Step 1: Translate point p to the origin
+	// Translate point p to the origin
 	float translatedX = p.X - origin.X;
 	float translatedZ = p.Z - origin.Z;
 
-	// Step 2: Rotate the point around the Y axis
+	// Rotate the point around the Y axis
 	float rotatedX = translatedX * cos(theta) - translatedZ * sin(theta);
 	float rotatedZ = translatedX * sin(theta) + translatedZ * cos(theta);
 
-	// Step 3: Translate the point back
+	// Translate the point back
 	myPoint3D rotatedPoint;
 	rotatedPoint.X = rotatedX + origin.X;
-	rotatedPoint.Y = p.Y; // y coordinate remains unchanged
+	rotatedPoint.Y = p.Y;
 	rotatedPoint.Z = rotatedZ + origin.Z;
 
 	return rotatedPoint;
 }
 
-
+/// <summary>
+/// Creates an array of vertices using the given points
+/// </summary>
 std::vector<myVertex*> createVerticesFromPoints(std::vector<myPoint3D> points)
 {
 	std::vector<myVertex*> vertices;
@@ -204,33 +217,11 @@ std::vector<myVertex*> createVerticesFromPoints(std::vector<myPoint3D> points)
 	return vertices;
 }
 
-
-double clamp(double value, double min, double max)
+/// <summary>
+/// Generates a mesh from a curve. It rotates it n times around the origin and links each rotated curve to the previous one
+/// </summary>
+void myMesh::generateFromCurve(std::vector<myPoint3D> curve, int n, int height)
 {
-	return std::max(std::min(value, max), min);
-}
-
-double smoothstep(double edge0, double edge1, double x) 
-{
-	x = clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
-	return x * x * (3 - 2 * x);
-}
-
-void myMesh::generateFromCurve()
-{
-	int height = 100;
-	int n = 50;
-	if (n <= 0) return;
-
-	std::vector<myPoint3D> curve;
-	for (size_t i = 0; i < height; i++)
-	{
-		float x = 0.25f + ((sin(float(i)/4) + 1)/2)/8;
-		float y = -0.5 + float(i)/ height;
-		float z = 0;
-		curve.push_back(myPoint3D(x, y ,z));
-	}
-
 	// Create first curve vertices
 	std::vector<std::vector<myVertex*>> curves_vertices = { createVerticesFromPoints(curve) };
 
@@ -243,15 +234,20 @@ void myMesh::generateFromCurve()
 			next_curve.push_back(getRotatedPoint(myPoint3D(0, 0, 0), curve[j], degreesToRadians(360.0) * i / n));
 		}
 
+		// Link the curves
 		std::vector<myVertex*> current_curve_vertices = curves_vertices.back();
 		std::vector<myVertex*> next_curve_vertices = createVerticesFromPoints(next_curve);
 
 		linkCurves(current_curve_vertices, next_curve_vertices);
 		curves_vertices.push_back(next_curve_vertices);
 	}
+	// Link the last and first curves
 	linkCurves(curves_vertices.back(), curves_vertices[0]);
 }
 
+/// <summary>
+/// Generates triangles to link two curves.
+/// </summary>
 void myMesh::linkCurves(std::vector<myVertex*> vertices1, std::vector<myVertex*> vertices2)
 {
 	// Set shortest and longest vector
@@ -269,7 +265,7 @@ void myMesh::linkCurves(std::vector<myVertex*> vertices1, std::vector<myVertex*>
 		shortest_vector = vertices1;
 	}
 
-	// Triangulate
+	// Link the curves using triangulation
 	myHalfedge* last_boundary_edge = nullptr;
 	myVertex* last_shortest_vector_vertex = shortest_vector[shortest_vector.size() - 1];
 	for (int i = 0; i < longest_vector.size(); i++)
@@ -340,6 +336,7 @@ void myMesh::linkCurves(std::vector<myVertex*> vertices1, std::vector<myVertex*>
 			he1->twin = he6;
 			he6->twin = he1;
 
+			// Set the twin of last iteration's edge
 			if (last_boundary_edge != nullptr)
 			{
 				he4->twin = last_boundary_edge;
@@ -389,7 +386,7 @@ void myMesh::linkCurves(std::vector<myVertex*> vertices1, std::vector<myVertex*>
 			he2->adjacent_face = face;
 			he3->adjacent_face = face;
 
-			// Set twins
+			// Set the twin of last iteration's edge
 			if (last_boundary_edge != nullptr)
 			{
 				he3->twin = last_boundary_edge;
@@ -408,6 +405,9 @@ void myMesh::linkCurves(std::vector<myVertex*> vertices1, std::vector<myVertex*>
 	vertices.insert(vertices.end(), vertices2.begin(), vertices2.end());
 }
 
+/// <summary>
+/// Generates a mesh from a .obj file
+/// </summary>
 bool myMesh::readFile(std::string filename)
 {
 	string s, t, u;
@@ -439,15 +439,12 @@ bool myMesh::readFile(std::string filename)
 			v->point = new myPoint3D(x, y, z);
 			v->index = vertices.size();
 			vertices.push_back(v);
-			//std::cout << "v " << x << " " << y << " " << z << " OK" << endl;
 		}
 		else if (t == "mtllib") {}
 		else if (t == "usemtl") {}
 		else if (t == "s") {}
 		else if (t == "f")
 		{
-			//std::cout << "f"; 
-
 			int i;
 			int prev_i = -1;
 			int first_i = -1;
@@ -465,12 +462,10 @@ bool myMesh::readFile(std::string filename)
 				{
 					prev_i = atoi((u.substr(0, u.find("/"))).c_str()) - 1;
 					first_i = prev_i;
-					//std::cout << " " << first_i << " ";
 					continue;
 				}
 
 				i = atoi((u.substr(0, u.find("/"))).c_str()) - 1;
-				//std::cout << i << " ";
 
 				// Create Half edges
 				myHalfedge* edge = new myHalfedge;
@@ -500,7 +495,7 @@ bool myMesh::readFile(std::string filename)
 				prev_i = i;
 			}
 
-			// Connect last and first edges
+			// Connect last and first edges (should use modulo instead)
 
 			// Create Half edges
 			myHalfedge* edge = new myHalfedge;
@@ -520,8 +515,6 @@ bool myMesh::readFile(std::string filename)
 
 			// Set face
 			edge->adjacent_face = face;
-
-			//std::cout << endl;
 		}
 	}
 
@@ -546,6 +539,9 @@ bool myMesh::readFile(std::string filename)
 	return true;
 }
 
+/// <summary>
+/// Computes the mesh's normals
+/// </summary>
 void myMesh::computeNormals()
 {
 	// Faces
@@ -561,6 +557,9 @@ void myMesh::computeNormals()
 	}
 }
 
+/// <summary>
+/// Normalizes the mesh
+/// </summary>
 void myMesh::normalize()
 {
 	if (vertices.size() < 1) return;
@@ -598,19 +597,22 @@ void myMesh::normalize()
 
 void myMesh::splitFaceTRIS(myFace *f, myPoint3D *p)
 {
-	/**** TODO ****/
+	/**** UNUSED ****/
 }
 
 void myMesh::splitEdge(myHalfedge *e1, myPoint3D *p)
 {
-	/**** TODO ****/
+	/**** UNUSED ****/
 }
 
 void myMesh::splitFaceQUADS(myFace *f, myPoint3D *p)
 {
-	/**** TODO ****/
+	/**** UNUSED ****/
 }
 
+/// <summary>
+/// Returns all the vertices that define a given face
+/// </summary>
 std::set<myVertex*> getFaceVertices(myFace* face)
 {
 	std::set<myVertex*> vertices;
@@ -619,10 +621,14 @@ std::set<myVertex*> getFaceVertices(myFace* face)
 	{
 		vertices.insert(he->source);
 		he = he->next;
-	} while (he != face->adjacent_halfedge);
+	} 
+	while (he != face->adjacent_halfedge);
 	return vertices;
 }
 
+/// <summary>
+/// Returns all the neighbor faces of a given vertex
+/// </summary>
 std::set<myFace*> getNeighborFaces(myVertex* v)
 {
 	std::set<myFace*> faces;
@@ -638,6 +644,9 @@ std::set<myFace*> getNeighborFaces(myVertex* v)
 	return faces;
 }
 
+/// <summary>
+/// Returns the edges that have a given vertex as their sources
+/// </summary>
 std::set<myHalfedge*> getNeighborEdges(myVertex* v)
 {
 	std::set<myHalfedge*> edges;
@@ -652,6 +661,9 @@ std::set<myHalfedge*> getNeighborEdges(myVertex* v)
 	return edges;
 }
 
+/// <summary>
+/// Calculates the average coordinates of an array of points
+/// </summary>
 myPoint3D getAveragePoint(std::set<myPoint3D> points)
 {
 	myPoint3D res = myPoint3D(0, 0, 0);
@@ -663,6 +675,9 @@ myPoint3D getAveragePoint(std::set<myPoint3D> points)
 	return res;
 }
 
+/// <summary>
+/// Calculates the average coordinates of an array of vertices
+/// </summary>
 myPoint3D getAveragePoint(std::set<myVertex*> vertices)
 {
 	std::set<myPoint3D> points;
@@ -673,18 +688,20 @@ myPoint3D getAveragePoint(std::set<myVertex*> vertices)
 	return getAveragePoint(points);
 }
 
+/// <summary>
+/// Computes the barycenter. wa, wb and wc are the weights of a, b and c
+/// </summary>
 myPoint3D getBarycenter(myPoint3D a, myPoint3D b, myPoint3D c, double wa, double wb, double wc, int n)
 {
 	return (a * wa + b * wb + c * wc) / n;
 }
 
 /// <summary>
+/// Subdivides the mesh to a more detailed geometry.
 /// https://en.wikipedia.org/wiki/Catmull%E2%80%93Clark_subdivision_surface
 /// </summary>
 void myMesh::subdivisionCatmullClark()
 {
-	//TODO: Check source, originof, next, prev, twin, adjacent_face, adjacent_he
-
 	std::map<myFace*, myVertex*> face_vertex_map;
 	std::map<myHalfedge*, myVertex*> edge_vertex_map;
 	std::map <std::pair<myVertex*, myVertex*>, myHalfedge*> he_map;
@@ -897,20 +914,25 @@ void myMesh::subdivisionCatmullClark()
 	checkMesh();
 }
 
+/// <summary>
+/// Check if a face is a triangle
+/// </summary>
 bool isTriangle(myFace* f)
 {
-	// Check if face is a triangle
 	if (f == nullptr || f->adjacent_halfedge == nullptr || f->adjacent_halfedge->next == nullptr || f->adjacent_halfedge->next->next == nullptr || f->adjacent_halfedge->next->next->next == nullptr) return false;
 	return f->adjacent_halfedge->next->next->next == f->adjacent_halfedge;
 }
 
+/// <summary>
+/// Triangulates the mesh
+/// </summary>
 void myMesh::triangulate()
 {
 	std::vector<myFace*> temp_faces = faces;
 	int fails = 0;
 	for (myFace* f : temp_faces)
 	{
-		if (!triangulate(f))
+		if (!triangulateFace(f))
 		{
 			fails++;
 		}
@@ -922,60 +944,9 @@ void myMesh::triangulate()
 	checkMesh();
 }
 
-myHalfedge* myMesh::getShortestValidEdgeNonTriangle()
-{
-	double min = INFINITY;
-	myHalfedge* min_he = nullptr;
-	int min_n_edges = INFINITY;
-	for (myHalfedge* he : halfedges)
-	{
-		// Check if face is a triangle
-		int n_edges = 0;
-		bool is_valid = true;
-		myHalfedge* current_he = he;
-		do 
-		{
-			if (current_he->twin == nullptr)
-			{
-				is_valid = false;
-				break;
-			}
-			current_he = current_he->next;
-			n_edges++;
-		}
-		while (current_he != he);
-
-		// Check if twin face is a triangle
-		int n_twin_edges = 0;
-		current_he = he->twin;
-		do
-		{
-			if (current_he->twin == nullptr)
-			{
-				is_valid = false;
-				break;
-			}
-			current_he = current_he->next;
-			n_twin_edges++;
-		} 
-		while (current_he != he->twin);
-
-		if (!is_valid || n_edges <= 3 || n_twin_edges <= 3) continue;
-
-		myPoint3D* p1 = he->source->point;
-		myPoint3D* p2 = he->twin->source->point;
-
-		double dist = p1->dist(*p2);
-		if (dist < min)
-		{
-			min = dist;
-			min_he = he;
-			min_n_edges = n_edges;
-		}
-	}
-	return min_he;
-}
-
+/// <summary>
+/// Returns the shortest valid edge for simplification
+/// </summary>
 myHalfedge* myMesh::getShortestValidEdge()
 {
 	double min = INFINITY;
@@ -1013,12 +984,15 @@ myHalfedge* myMesh::getShortestValidEdge()
 	return min_he;
 }
 
+/// <summary>
+/// Finds the most appropriate edge and removes it to simplify the mesh
+/// </summary>
 void myMesh::simplify()
 {
 	myHalfedge* shortest_edge = getShortestValidEdge();
 	if (shortest_edge == nullptr || faces.size() < 3)
 	{
-		std::cerr << "No polygon left for simplification" << std::endl;
+		std::cerr << "No valid polygon left for simplification" << std::endl;
 	}
 	else if (!unifyEdge(shortest_edge, COLLAPSE_AVERAGE))
 	{
@@ -1026,14 +1000,9 @@ void myMesh::simplify()
 	}
 }
 
-void myMesh::resetOriginOf()
-{
-	for (myHalfedge* he : halfedges)
-	{
-		he->source->originof = he;
-	}
-}
-
+/// <summary>
+/// Removes a vertex and it's references
+/// </summary>
 void myMesh::freeVertex(myVertex* v)
 {
 	for (myHalfedge* he : halfedges)
@@ -1046,9 +1015,11 @@ void myMesh::freeVertex(myVertex* v)
 	delete v;
 }
 
+/// <summary>
+/// Removes a point and it's references
+/// </summary>
 void myMesh::freePoint(myPoint3D* p)
 {
-
 	for (myVertex* v : vertices)
 	{
 		if (v->point == p)
@@ -1059,6 +1030,9 @@ void myMesh::freePoint(myPoint3D* p)
 	delete p;
 }
 
+/// <summary>
+/// Removes an half edge and it's references
+/// </summary>
 void myMesh::freeHalfEdge(myHalfedge* he)
 {
 	for (myVertex* v : vertices)
@@ -1095,6 +1069,9 @@ void myMesh::freeHalfEdge(myHalfedge* he)
 	delete he;
 }
 
+/// <summary>
+/// Removes an face and it's references
+/// </summary>
 void myMesh::freeFace(myFace* f)
 {
 	if (f->adjacent_halfedge != nullptr)
@@ -1111,6 +1088,9 @@ void myMesh::freeFace(myFace* f)
 	delete f;
 }
 
+/// <summary>
+/// Removes an edge, collapsing it's two vertices
+/// </summary>
 bool myMesh::unifyEdge(myHalfedge* he, CollapseMode mode)
 {
 	myHalfedge* he_to_delete = he;
@@ -1123,10 +1103,6 @@ bool myMesh::unifyEdge(myHalfedge* he, CollapseMode mode)
 
 	bool face_is_triangle = he->next->next->next == he;
 	bool twin_is_triangle = he->twin->next->next->next == he->twin;
-
-	// Use if not willing to simplify triangles
-	//if (face_is_triangle) return false;
-	//if (twin_is_triangle) return false;
 
 	if (v_target == v_to_delete) return false;
 
@@ -1176,6 +1152,7 @@ bool myMesh::unifyEdge(myHalfedge* he, CollapseMode mode)
 
 	}
 	
+	// Remove face
 	if (face_is_triangle)
 	{
 		twin_A1->twin = twin_1A;
@@ -1190,6 +1167,7 @@ bool myMesh::unifyEdge(myHalfedge* he, CollapseMode mode)
 		halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), he_to_delete->next), halfedges.end());
 		freeHalfEdge(he_to_delete->next);
 	}
+	// Remove twin face
 	if (twin_is_triangle)
 	{
 		twin_B2->twin = twin_2B;
@@ -1205,6 +1183,7 @@ bool myMesh::unifyEdge(myHalfedge* he, CollapseMode mode)
 		freeHalfEdge(twin_to_delete->next);
 	}
 
+	// Remove original half edges & vertex
 	halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), he_to_delete), halfedges.end());
 	freeHalfEdge(he_to_delete);
 
@@ -1224,7 +1203,10 @@ bool myMesh::unifyEdge(myHalfedge* he, CollapseMode mode)
 	return true;
 }
 
-bool myMesh::triangulate(myFace *f)
+/// <summary>
+/// Triangulates a face
+/// </summary>
+bool myMesh::triangulateFace(myFace *f)
 {
 	// Check if face is a triangle
 	if (isTriangle(f))

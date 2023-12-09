@@ -27,6 +27,9 @@ void myPoint3D::copyValuesFrom(const myPoint3D& p)
 	Z = p.Z;
 }
 
+/// <summary>
+/// Needed for sorting
+/// </summary>
 bool myPoint3D::operator<(const myPoint3D& other) const
 {
 	if (X < other.X) return true;
